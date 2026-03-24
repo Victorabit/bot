@@ -24,14 +24,15 @@ async function startBot() {
                 '--disable-accelerated-2d-canvas',
                 '--no-first-run',
                 '--no-zygote',
-                '--disable-gpu'
+                '--disable-gpu',
+                '--single-process'
             ]
         }
     });
 
     // Exibe o QR Code no terminal
     client.on('qr', (qr) => {
-        console.log('\n📲 LEIA O QR CODE ABAIXO COM O WHATSAPP DA M2:');
+        logger.info({ qr }, '📲 QR Code recebido! Gerando imagem no terminal...');
         qrcode.generate(qr, { small: true });
     });
 
