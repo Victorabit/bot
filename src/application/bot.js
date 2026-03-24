@@ -19,7 +19,12 @@ async function startBot() {
                 '--no-sandbox', 
                 '--disable-setuid-sandbox',
                 '--disable-blink-features=AutomationControlled',
-                '--disable-features=site-per-process'
+                '--disable-features=site-per-process',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--disable-gpu'
             ]
         }
     });
