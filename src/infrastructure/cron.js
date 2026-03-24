@@ -15,15 +15,19 @@ function startCronJob() {
                 return;
             }
 
-            const count = await exportLeadsToSheet(leads);
-            logger.info({ count }, '⏰ [CRON] Sucesso! Leads exportados para o Google Planilhas.');
+            if (process.env.GOOGLE_SPREADSHEET_ID) {
+                const count = await exportLeadsToSheet(leads);
+                logger.info({ count }, '⏰ [CRON] Sucesso! Leads exportados para o Google Planilhas.');
+            } else {
+                logger.info('⏰ [CRON] Google Sheets não configurado. Pulando exportação.');
+            }
             
-            // Após exportar com sucesso, limpa os leads locais para o dia seguinte
+            // Após exportar (ou pular), limpa os leads locais para o dia seguinte
             await clearLeads();
             logger.info('⏰ [CRON] Lista local de leads limpa.');
             
         } catch (error) {
-            logger.error({ error: error.message }, '⏰ [CRON] Falha na exportação Google.');
+            logger.error({ error: error.message }, '⏰ [CRON] Falha na rotina diária.');
         }
     });
 
