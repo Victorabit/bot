@@ -1,0 +1,8 @@
+node_modules/
+.env
+auth_session/
+leads.json
+.gemini/
+.tmp/
+*.log
+package-lock.json
