@@ -15,6 +15,7 @@ async function startBot() {
         authStrategy: new LocalAuth({ dataPath: './auth_session' }),
         puppeteer: {
             headless: true,
+            protocolTimeout: 60000,
             args: [
                 '--no-sandbox', 
                 '--disable-setuid-sandbox',
@@ -24,7 +25,11 @@ async function startBot() {
                 '--disable-accelerated-2d-canvas',
                 '--no-first-run',
                 '--no-zygote',
-                '--disable-gpu'
+                '--disable-gpu',
+                '--disable-extensions',
+                '--disable-default-apps',
+                '--mute-audio',
+                '--no-default-browser-check'
             ]
         }
     });
