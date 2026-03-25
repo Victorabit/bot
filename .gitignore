@@ -6,3 +6,5 @@ leads.json
 .tmp/
 *.log
 package-lock.json
+.wwebjs_cache/
+handoff_persistence.json
