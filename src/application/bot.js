@@ -42,20 +42,21 @@ async function startBot() {
                 '--disable-accelerated-2d-canvas',
                 '--no-first-run',
                 '--no-zygote',
-                '--js-flags="--max-old-space-size=128"', // Limita RAM V8 interna do Chrome
-                '--disable-renderer-backgrounding',
-                '--disable-background-timer-throttling',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-client-side-phishing-detection',
-                '--disable-crash-reporter',
-                '--disable-oopr-debug-crash-dump',
-                '--disable-low-res-tiling',
-                '--disable-notifications',
                 '--disable-gpu',
                 '--disable-extensions',
                 '--disable-default-apps',
                 '--mute-audio',
-                '--no-default-browser-check'
+                '--no-default-browser-check',
+                '--js-flags="--max-old-space-size=128"', 
+                '--disable-renderer-backgrounding',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disk-cache-size=0',
+                '--media-cache-size=0',
+                '--disk-cache-dir=/dev/null',
+                '--disable-software-rasterizer',
+                '--disable-ipc-flooding-protection',
+                '--disable-push-api-background-mode'
             ]
         }
     });
@@ -227,6 +228,7 @@ function startWatchdog() {
         
         try {
             logger.debug('🐕 Handoff Watchdog: Verificando saúde do navegador...');
+            if (global.gc) global.gc(); // Limpa memória do Node periodicamente
             await activeClient.getWWebVersion();
         } catch (error) {
             logger.fatal('🚨 NAVEGADOR NÃO RESPONDE! Reiniciando bot para recuperação...');
