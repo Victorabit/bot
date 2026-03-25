@@ -6,8 +6,8 @@ const logger = require('./logger');
  */
 class MemoryMonitor {
     constructor(options = {}) {
-        this.interval = options.interval || 300000; // 5 minutos padrão
-        this.gcThreshold = options.gcThreshold || 700 * 1024 * 1024; // 700MB
+        this.interval = options.interval || 60000; // 1 minuto padrão
+        this.gcThreshold = options.gcThreshold || 500 * 1024 * 1024; // 500MB
         this.restartThreshold = options.restartThreshold || 900 * 1024 * 1024; // 900MB
         this.timer = null;
     }

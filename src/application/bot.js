@@ -42,7 +42,7 @@ async function startBot() {
                 '--disable-accelerated-2d-canvas',
                 '--no-first-run',
                 '--no-zygote',
-                '--js-flags="--max-old-space-size=256"', // Limita RAM V8 interna do Chrome
+                '--js-flags="--max-old-space-size=128"', // Limita RAM V8 interna do Chrome
                 '--disable-renderer-backgrounding',
                 '--disable-background-timer-throttling',
                 '--disable-backgrounding-occluded-windows',
