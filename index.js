@@ -2,7 +2,11 @@ const { startBot } = require('./src/application/bot.js');
 const { startCronJob } = require('./src/infrastructure/cron.js');
 const { initStorage } = require('./src/infrastructure/storage.js');
 const logger = require('./src/infrastructure/logger');
+const memoryMonitor = require('./src/infrastructure/memory.js');
 require('dotenv').config();
+
+// Inicia monitoramento de RAM para Square Cloud (1GB)
+memoryMonitor.start();
 
 const fs = require('fs');
 const path = require('path');
@@ -27,9 +31,10 @@ async function main() {
     const client = await startBot();
 
     // 4. Tratamento de encerramento limpo (Evita erro de 'browser already running')
+    const { shutdownBot } = require('./src/application/bot.js');
     const shutdown = async () => {
         logger.info('🛑 Encerrando sistema de forma segura...');
-        if (client) await client.destroy();
+        await shutdownBot();
         logger.info('✅ Bot desconectado. Finalizando processo.');
         process.exit(0);
     };

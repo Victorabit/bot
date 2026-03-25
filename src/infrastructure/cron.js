@@ -1,6 +1,8 @@
 const cron = require('node-cron');
 const { getDailyLeads, clearLeads } = require('./storage');
 const { exportLeadsToSheet } = require('./sheets');
+const { clearHandedOver } = require('../application/bot');
+const { clearAllChatSessions } = require('./ai');
 const logger = require('./logger');
 require('dotenv').config();
 function startCronJob() {
@@ -24,7 +26,9 @@ function startCronJob() {
             
             // Após exportar (ou pular), limpa os leads locais para o dia seguinte
             await clearLeads();
-            logger.info('⏰ [CRON] Lista local de leads limpa.');
+            clearHandedOver();
+            clearAllChatSessions();
+            logger.info('⏰ [CRON] Lista local de leads, handoff e sessões de IA limpos.');
             
         } catch (error) {
             logger.error({ error: error.message }, '⏰ [CRON] Falha na rotina diária.');

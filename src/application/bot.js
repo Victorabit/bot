@@ -8,13 +8,30 @@ require('dotenv').config();
 // Conjunto para rastrear clientes já repassados para atendimento humano
 const handedOver = new Set();
 
+// Instância única do cliente para evitar vazamento de memória e múltiplas respostas
+let activeClient = null;
+
+// Maps para gerenciar o buffer de mensagens (multi-bolhas)
+const messageBuffers = new Map();
+const bufferTimeouts = new Map();
+
 async function startBot() {
+    if (activeClient) {
+        logger.info('🛑 Finalizando instância anterior antes de reiniciar...');
+        try {
+            await activeClient.destroy();
+        } catch (e) {
+            logger.error('⚠️ Erro ao destruir cliente antigo');
+        }
+    }
+
     logger.info('🚀 Inicializando WhatsApp Bot (whatsapp-web.js)...');
 
-    const client = new Client({
+    activeClient = new Client({
         authStrategy: new LocalAuth({ dataPath: './auth_session' }),
         puppeteer: {
             headless: true,
+            handleSIGINT: false, 
             protocolTimeout: 60000,
             args: [
                 '--no-sandbox', 
@@ -25,6 +42,7 @@ async function startBot() {
                 '--disable-accelerated-2d-canvas',
                 '--no-first-run',
                 '--no-zygote',
+                '--single-process',
                 '--disable-gpu',
                 '--disable-extensions',
                 '--disable-default-apps',
@@ -33,6 +51,8 @@ async function startBot() {
             ]
         }
     });
+
+    const client = activeClient;
 
     // Exibe o QR Code no terminal
     client.on('qr', (qr) => {
@@ -49,7 +69,6 @@ async function startBot() {
     client.on('disconnected', async (reason) => {
         logger.warn({ reason }, '⚠️ Bot desconectado');
 
-        // Se foi um logout explícito, limpa a sessão salva para gerar novo QR
         if (reason === 'LOGOUT' || reason === 'NAVIGATION') {
             console.log('🗑️  Sessão encerrada. Limpando dados de autenticação...');
             const fs = require('fs').promises;
@@ -57,69 +76,90 @@ async function startBot() {
                 await fs.rm('./auth_session', { recursive: true, force: true });
                 console.log('✅ Sessão limpa. Reiniciando e gerando novo QR Code...\n');
             } catch { /* pasta já não existe */ }
-        } else {
-            console.log('⏳ Tentando reconectar em 5 segundos...');
         }
 
-        setTimeout(() => startBot(), 5000);
+        logger.info('⏳ Tentando reconectar em 10 segundos...');
+        setTimeout(() => startBot(), 10000);
     });
 
     // Escuta novas mensagens
     client.on('message', async (msg) => {
-        // Ignora mensagens recebidas enquanto o bot estava desligado (mais de 60 segundos atrás) para evitar sobrecarregar a cota gratuita do Google
-        if (msg.timestamp < (Date.now() / 1000) - 60) {
-            logger.debug({ msgId: msg.id._serialized }, '⏳ Ignorando mensagem antiga');
-            return;
-        }
-
-        // Ignora mensagens de grupos, status e newsletters
+        // Filtros básicos
+        if (msg.timestamp < (Date.now() / 1000) - 60) return;
         if (msg.from.endsWith('@g.us') || msg.from === 'status@broadcast' || msg.from.endsWith('@newsletter')) return;
-        // Ignora mensagens enviadas por nós mesmos
         if (msg.fromMe) return;
 
         const phone = msg.from.replace('@c.us', '');
-        const contact = await msg.getContact();
-        const pushName = contact.pushname || contact.name || 'Desconhecido';
 
-        // 🛡️ FILTRO DE AGENDA: Ignora contatos já salvos no celular
-        if (contact.isMyContact) {
-            logger.debug({ phone, pushName }, '👤 Contato na agenda. Ignorando.');
-            return;
-        }
+        // 🛡️ FILTRO DE HANDOFF & MÍDIA
+        if (handedOver.has(phone)) return;
 
-        // 🛡️ SE MANDAR ÁUDIO OU IMAGEM, O BOT PARA DE RESPONDER (Handoff silencioso)
         if (msg.hasMedia || msg.type === 'audio' || msg.type === 'ptt' || msg.type === 'image' || msg.type === 'video') {
             logger.info({ phone }, '⚠️ Mídia/Áudio recebido. Parando responder.');
             handedOver.add(phone);
             return;
         }
 
-        console.log(`📩 Nova mensagem de: ${pushName} (${phone})`);
+        const contact = await msg.getContact();
+        if (contact.isMyContact) return;
 
-        if (handedOver.has(phone)) {
-            console.log(`💁 Atendimento humano atuando para ${phone}. Ignorando IA.`);
-            return;
+        const pushName = contact.pushname || contact.name || 'Desconhecido';
+
+        // 📝 SISTEMA DE BUFFER (MULTI-BOLHAS)
+        if (!messageBuffers.has(phone)) {
+            messageBuffers.set(phone, []);
+        }
+        messageBuffers.get(phone).push(msg.body);
+
+        // Reinicia o cronômetro de 5 segundos a cada nova mensagem
+        if (bufferTimeouts.has(phone)) {
+            clearTimeout(bufferTimeouts.get(phone));
         }
 
-        try {
-            // Tenta salvar o lead (a função cuida de verificar se já existe hoje)
-            await saveLead(phone, pushName);
-        } catch (err) {
-            logger.error({ phone, error: err.message }, '⚠️ Erro ao salvar no Supabase');
-        }
+        // Mostra que está digitando imediatamente
+        const chat = await msg.getChat();
+        chat.sendStateTyping();
 
-        logger.info({ phone, pushName }, '🤖 Processando resposta IA');
-        
-        // Simula "digitando..."
+        const timeout = setTimeout(async () => {
+            const bubbles = messageBuffers.get(phone);
+            const fullMessage = bubbles.join('\n');
+            
+            // Limpa o buffer para este usuário
+            messageBuffers.delete(phone);
+            bufferTimeouts.delete(phone);
+
+            await processFinalMessage(client, msg, phone, pushName, fullMessage);
+        }, 5000);
+
+        bufferTimeouts.set(phone, timeout);
+    });
+
+    client.initialize();
+    return client;
+}
+
+/**
+ * Processa a mensagem final (após o buffer) e envia para a IA
+ */
+async function processFinalMessage(client, msg, phone, pushName, fullMessage) {
+    console.log(`📩 Processando combo de mensagens de: ${pushName} (${phone})`);
+    
+    try {
+        await saveLead(phone, pushName);
+    } catch (err) {
+        logger.error({ phone, error: err.message }, '⚠️ Erro ao salvar no Supabase');
+    }
+
+    logger.info({ phone, pushName }, '🤖 Gerando resposta para o combo de mensagens');
+    
+    try {
         const chat = await msg.getChat();
         await chat.sendStateTyping();
 
-        // Gera a resposta com a inteligência da Groq (que agora retorna um objeto validado pelo Zod)
-        const data = await generateAIResponse(phone, msg.body);
-        
+        const data = await generateAIResponse(phone, fullMessage);
         const messageToClient = data.reply || "Como posso te ajudar?";
         
-        // Simula tempo de digitação humana
+        // Simulação de tempo de digitação humana
         await chat.sendStateTyping();
         const pauseTime = Math.min(Math.max(messageToClient.length * 20, 2000), 5000);
         await new Promise(r => setTimeout(r, pauseTime));
@@ -127,19 +167,29 @@ async function startBot() {
         await msg.reply(messageToClient);
         logger.info({ phone, class: data.classificacao, score: data.lead_score }, '✅ Resposta IA enviada');
 
-        // Verifica transições de estado para Handoff ou Encerramento
         if (data.estado === 'PRONTO_PARA_FECHAMENTO') {
              logger.warn({ phone, class: data.classificacao }, '🔥 LEAD QUENTE: Pronto para fechamento');
-             handedOver.add(phone); // Muta o bot para este cliente
+             handedOver.add(phone);
         } else if (data.estado === 'ENCERRADO') {
              logger.info({ phone }, '🧊 LEAD ENCERRADO');
              handedOver.add(phone);
              clearChatSession(phone);
         }
-    });
-
-    client.initialize();
-    return client;
+    } catch (err) {
+        logger.error({ phone, error: err.message }, '❌ Erro ao processar resposta final');
+    }
 }
 
-module.exports = { startBot };
+function clearHandedOver() {
+    logger.info('🧹 Limpando lista de atendimento humano (Handoff)...');
+    handedOver.clear();
+}
+
+async function shutdownBot() {
+    if (activeClient) {
+        logger.info('🛑 Encerrando instância ativa do bot...');
+        await activeClient.destroy();
+    }
+}
+
+module.exports = { startBot, clearHandedOver, shutdownBot };
