@@ -8,6 +8,15 @@ require('dotenv').config();
 // Inicia monitoramento de RAM para Square Cloud (1GB)
 memoryMonitor.start();
 
+// 🛡️ ESCUDO GLOBAL DE ERROS: Impede que erros inesperados derrubem o processo sem log
+process.on('uncaughtException', (err) => {
+    logger.fatal({ error: err.message, stack: err.stack }, '❌ ERRO NÃO TRATADO (uncaughtException)');
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    logger.error({ reason, promise }, '⚠️ PROMESSA REJEITADA NÃO TRATADA (unhandledRejection)');
+});
+
 const fs = require('fs');
 const path = require('path');
 

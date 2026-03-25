@@ -5,11 +5,11 @@ const { generateAIResponse, clearChatSession } = require('../infrastructure/ai')
 const logger = require('../infrastructure/logger');
 require('dotenv').config();
 
-// Conjunto para rastrear clientes já repassados para atendimento humano
-const handedOver = new Set();
+const handoffManager = require('../infrastructure/handoff');
 
 // Instância única do cliente para evitar vazamento de memória e múltiplas respostas
 let activeClient = null;
+let watchdogTimer = null;
 
 // Maps para gerenciar o buffer de mensagens (multi-bolhas)
 const messageBuffers = new Map();
@@ -92,11 +92,11 @@ async function startBot() {
         const phone = msg.from.replace('@c.us', '');
 
         // 🛡️ FILTRO DE HANDOFF & MÍDIA
-        if (handedOver.has(phone)) return;
+        if (handoffManager.has(phone)) return;
 
         if (msg.hasMedia || msg.type === 'audio' || msg.type === 'ptt' || msg.type === 'image' || msg.type === 'video') {
             logger.info({ phone }, '⚠️ Mídia/Áudio recebido. Parando responder.');
-            handedOver.add(phone);
+            handoffManager.add(phone);
             return;
         }
 
@@ -134,6 +134,8 @@ async function startBot() {
         bufferTimeouts.set(phone, timeout);
     });
 
+    startWatchdog();
+
     client.initialize();
     return client;
 }
@@ -169,10 +171,10 @@ async function processFinalMessage(client, msg, phone, pushName, fullMessage) {
 
         if (data.estado === 'PRONTO_PARA_FECHAMENTO') {
              logger.warn({ phone, class: data.classificacao }, '🔥 LEAD QUENTE: Pronto para fechamento');
-             handedOver.add(phone);
+             handoffManager.add(phone);
         } else if (data.estado === 'ENCERRADO') {
              logger.info({ phone }, '🧊 LEAD ENCERRADO');
-             handedOver.add(phone);
+             handoffManager.add(phone);
              clearChatSession(phone);
         }
     } catch (err) {
@@ -182,7 +184,27 @@ async function processFinalMessage(client, msg, phone, pushName, fullMessage) {
 
 function clearHandedOver() {
     logger.info('🧹 Limpando lista de atendimento humano (Handoff)...');
-    handedOver.clear();
+    handoffManager.clear();
+}
+
+/**
+ * Inicia vigia do navegador para garantir que o Chrome não travou
+ */
+function startWatchdog() {
+    if (watchdogTimer) clearInterval(watchdogTimer);
+    
+    // Testa o navegador a cada 30 minutos
+    watchdogTimer = setInterval(async () => {
+        if (!activeClient) return;
+        
+        try {
+            logger.debug('🐕 Handoff Watchdog: Verificando saúde do navegador...');
+            await activeClient.getWWebVersion();
+        } catch (error) {
+            logger.fatal('🚨 NAVEGADOR NÃO RESPONDE! Reiniciando bot para recuperação...');
+            startBot();
+        }
+    }, 1800000);
 }
 
 async function shutdownBot() {
