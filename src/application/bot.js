@@ -42,7 +42,15 @@ async function startBot() {
                 '--disable-accelerated-2d-canvas',
                 '--no-first-run',
                 '--no-zygote',
-                '--single-process',
+                '--js-flags="--max-old-space-size=256"', // Limita RAM V8 interna do Chrome
+                '--disable-renderer-backgrounding',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-client-side-phishing-detection',
+                '--disable-crash-reporter',
+                '--disable-oopr-debug-crash-dump',
+                '--disable-low-res-tiling',
+                '--disable-notifications',
                 '--disable-gpu',
                 '--disable-extensions',
                 '--disable-default-apps',
@@ -53,6 +61,19 @@ async function startBot() {
     });
 
     const client = activeClient;
+
+    // Lifecycle hooks para depuração e estabilidade
+    client.on('loading_screen', (percent, message) => {
+        logger.info({ percent, message }, '⏳ Carregando WhatsApp Web...');
+    });
+
+    client.on('authenticated', () => {
+        logger.info('🔐 Autenticado com sucesso!');
+    });
+
+    client.on('auth_failure', (msg) => {
+        logger.error({ msg }, '❌ Falha na autenticação!');
+    });
 
     // Exibe o QR Code no terminal
     client.on('qr', (qr) => {
@@ -100,7 +121,15 @@ async function startBot() {
             return;
         }
 
-        const contact = await msg.getContact();
+        // Proteção contra chamadas que travam (timeout de 10s para contatos)
+        const contactPromise = msg.getContact();
+        const contact = await Promise.race([
+            contactPromise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout ao buscar contato')), 10000))
+        ]).catch(err => {
+            logger.error({ phone, error: err.message }, '⚠️ Falha ao obter contato');
+            return { pushname: 'Desconhecido', isMyContact: false };
+        });
 
         const pushName = contact.pushname || contact.name || 'Desconhecido';
 

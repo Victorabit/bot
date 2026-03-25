@@ -147,7 +147,7 @@ async function generateAIResponse(userId, message, retryCount = 0) {
             model: "llama-3.3-70b-versatile",
             temperature: 0.7,
             response_format: { type: "json_object" },
-        });
+        }, { timeout: 30000 }); // Timeout de 30 segundos
 
         const responseText = completion.choices[0]?.message?.content || "{}";
         
