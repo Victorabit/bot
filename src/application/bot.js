@@ -101,7 +101,6 @@ async function startBot() {
         }
 
         const contact = await msg.getContact();
-        if (contact.isMyContact) return;
 
         const pushName = contact.pushname || contact.name || 'Desconhecido';
 
