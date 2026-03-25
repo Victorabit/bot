@@ -10,12 +10,20 @@ const handoffManager = require('../infrastructure/handoff');
 // Instância única do cliente para evitar vazamento de memória e múltiplas respostas
 let activeClient = null;
 let watchdogTimer = null;
+let isInitializing = false;
 
 // Maps para gerenciar o buffer de mensagens (multi-bolhas)
 const messageBuffers = new Map();
 const bufferTimeouts = new Map();
 
 async function startBot() {
+    if (isInitializing) {
+        logger.warn('🔄 Tentativa de reinicialização ignorada: Bot já está iniciando.');
+        return;
+    }
+    
+    isInitializing = true;
+
     if (activeClient) {
         logger.info('🛑 Finalizando instância anterior antes de reiniciar...');
         try {
@@ -43,11 +51,10 @@ async function startBot() {
                 '--no-first-run',
                 '--no-zygote',
                 '--disable-gpu',
-                '--disable-extensions',
-                '--disable-default-apps',
                 '--mute-audio',
                 '--no-default-browser-check',
-                '--js-flags="--max-old-space-size=128"', 
+                '--js-flags="--max-old-space-size=96"', // Redução extrema: 96MB para V8 Chrome
+                '--blink-settings=imagesEnabled=false', // BLOQUEIA TODAS AS IMAGENS NO MOTOR
                 '--disable-renderer-backgrounding',
                 '--disable-background-timer-throttling',
                 '--disable-backgrounding-occluded-windows',
@@ -56,7 +63,14 @@ async function startBot() {
                 '--disk-cache-dir=/dev/null',
                 '--disable-software-rasterizer',
                 '--disable-ipc-flooding-protection',
-                '--disable-push-api-background-mode'
+                '--disable-push-api-background-mode',
+                '--disable-extensions',
+                '--disable-default-apps',
+                '--disable-sync',
+                '--hide-scrollbars',
+                '--disable-speech-api',
+                '--disable-site-isolation-trials',
+                '--disable-web-security' // Pode economizar RAM em verificações de cross-origin
             ]
         }
     });
@@ -84,11 +98,13 @@ async function startBot() {
 
     // Confirmação de conexão
     client.on('ready', () => {
+        isInitializing = false;
         logger.info('✅ Bot conectado e pronto para receber mensagens 24/7!');
     });
 
     // Reconexão automática em caso de desconexão
     client.on('disconnected', async (reason) => {
+        isInitializing = false;
         logger.warn({ reason }, '⚠️ Bot desconectado');
 
         if (reason === 'LOGOUT' || reason === 'NAVIGATION') {
