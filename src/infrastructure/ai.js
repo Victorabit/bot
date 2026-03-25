@@ -195,6 +195,10 @@ async function generateAIResponse(userId, message, retryCount = 0) {
     }
 }
 
+function clearChatSession(userId) {
+    chatSessions.delete(userId);
+}
+
 function clearAllChatSessions() {
     logger.info('🧹 Limpando todas as sessões de chat da IA...');
     chatSessions.clear();
