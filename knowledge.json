@@ -1,0 +1,101 @@
+{
+  "empresa": {
+    "nome": "M2 Clips",
+    "descricao": "Agência de vídeos animados para redes sociais",
+    "servicos": [
+      "Vídeos animados 20s",
+      "Vídeos 30s",
+      "Vídeos 60s",
+      "Pacotes semanais/mensais",
+      "Imagens para apoio"
+    ],
+    "diferenciais": "Alta qualidade, entrega rápida, preço acessível"
+  },
+  "regras": {
+    "siempre_falar_como_pessoa": true,
+    "nunca_revelar_ser_ia": true,
+    "uma_pergunta_por_vez": true,
+    "nao_repetir_perguntas": true
+  },
+  "precos": {
+    "20s": {
+      "1": 100,
+      "3": 270,
+      "5": 400,
+      "10": 700
+    },
+    "30s": {
+      "1": 180,
+      "3": 510,
+      "5": 800,
+      "10": 1500
+    },
+    "60s": {
+      "1": 220,
+      "3": 630,
+      "5": 1000,
+      "10": 1900
+    },
+    "recorrente": {
+      "semanal": 400,
+      "mensal": 1500
+    },
+    "urgente": 50
+  },
+  "clientes": {
+    "233182381256897@lid": {
+      "nome": "Desconhecido",
+      "primeira_interacao": "2026-03-27T00:01:54.630Z",
+      "ultimo_contato": "2026-03-27T00:16:04.333Z",
+      "classificacao": "QUENTE_1",
+      "score": 70,
+      "estado": "EM_ATENDIMENTO",
+      "historico": [
+        {
+          "timestamp": "2026-03-27T00:01:54.631Z",
+          "classificacao": "FRIO_1",
+          "score": 10,
+          "intent": "Saúdo"
+        },
+        {
+          "timestamp": "2026-03-27T00:06:38.798Z",
+          "classificacao": "FRIO_1",
+          "score": 10,
+          "intent": "Saúdo"
+        },
+        {
+          "timestamp": "2026-03-27T00:14:35.225Z",
+          "classificacao": "FRIO_1",
+          "score": 10,
+          "intent": "Saúdo"
+        },
+        {
+          "timestamp": "2026-03-27T00:15:12.345Z",
+          "classificacao": "FRIO_1",
+          "score": 10,
+          "intent": "Informação sobre serviços"
+        },
+        {
+          "timestamp": "2026-03-27T00:15:32.545Z",
+          "classificacao": "FRIO_2",
+          "score": 40,
+          "intent": "Informação sobre animação"
+        },
+        {
+          "timestamp": "2026-03-27T00:16:04.333Z",
+          "classificacao": "QUENTE_1",
+          "score": 70,
+          "intent": "Informação sobre preços"
+        }
+      ],
+      "preferencias": {}
+    }
+  },
+  "historico_conversas": {},
+  "personas": {
+    "profissional": "Focado, quer resultados rápidos",
+    "curioso": "Pergunta muito, quer entender tudo",
+    "preocupado": "Tem dúvidas sobre qualidade/prazo",
+    "decidido": "Já sabe o que quer, só precisa de preço"
+  }
+}

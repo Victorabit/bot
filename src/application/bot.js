@@ -201,13 +201,25 @@ async function processFinalMessage(client, msg, phone, pushName, fullMessage) {
     
     try {
         const chat = await msg.getChat();
-        await chat.sendStateTyping();
+        
+        if (!chat) {
+            logger.error({ phone }, '❌ Chat não encontrado');
+            return;
+        }
+
+        try {
+            await chat.sendStateTyping();
+        } catch (e) {
+            logger.warn({ phone }, '⚠️ Erro ao enviar typing, continuando...');
+        }
 
         const data = await generateAIResponse(phone, fullMessage);
         const messageToClient = data.reply || "Como posso te ajudar?";
         
-        // Simulação de tempo de digitação humana
-        await chat.sendStateTyping();
+        try {
+            await chat.sendStateTyping();
+        } catch (e) {}
+        
         const pauseTime = Math.min(Math.max(messageToClient.length * 20, 2000), 5000);
         await new Promise(r => setTimeout(r, pauseTime));
 

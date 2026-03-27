@@ -1,0 +1,17 @@
+{
+  "videos": [
+    {
+      "file": "video1.mp4",
+      "legenda": "Vídeo 1",
+      "postado": false,
+      "dataPostagem": null
+    }
+  ],
+  "config": {
+    "diasSemana": ["segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"],
+    "horarios": ["09:00", "12:00", "15:00", "18:00", "21:00"],
+    "videosPorDia": 3,
+    "iniciado": false
+  },
+  "historico": []
+}
