@@ -76,4 +76,33 @@ async function clearLeads() {
     return true; 
 }
 
-module.exports = { initStorage, saveLead, getDailyLeads, clearLeads };
+// ========== PERSISTÊNCIA DE CHAT (contexto entre reinicializações) ==========
+
+async function saveChatMessage(userId, role, content) {
+    const db = getSupabase();
+    const { error } = await db.from('chat_history').insert({
+        user_id: userId,
+        role,
+        content
+    });
+    if (error) {
+        logger.error({ userId, role, error: error.message }, 'Erro ao salvar mensagem no Supabase');
+    }
+}
+
+async function getChatHistory(userId) {
+    const db = getSupabase();
+    const { data, error } = await db
+        .from('chat_history')
+        .select('role, content')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true });
+
+    if (error) {
+        logger.error({ userId, error: error.message }, 'Erro ao buscar histórico do Supabase');
+        return null;
+    }
+    return data || [];
+}
+
+module.exports = { initStorage, saveLead, getDailyLeads, clearLeads, saveChatMessage, getChatHistory };

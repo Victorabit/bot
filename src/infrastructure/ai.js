@@ -1,6 +1,7 @@
 const Groq = require('groq-sdk');
 const { AIResponseSchema } = require('../domain/schemas');
 const logger = require('./logger');
+const { saveChatMessage, getChatHistory } = require('./storage');
 require('dotenv').config();
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
@@ -129,19 +130,32 @@ Os pacotes já incluem uma quantidade definida de imagens para manter organizaç
 }
 `;;
 
-// Armazena as sessões de chat em memória (histórico)
+// Armazena as sessões de chat em memória (cache rápido)
 const chatSessions = new Map();
+
+async function loadChatSession(userId) {
+    const history = [{ role: "system", content: SYSTEM_PROMPT }];
+    
+    const savedHistory = await getChatHistory(userId);
+    if (savedHistory && savedHistory.length > 0) {
+        for (const msg of savedHistory) {
+            history.push({ role: msg.role, content: msg.content });
+        }
+        logger.info({ userId, messages: savedHistory.length }, '📜 Histórico carregado do Supabase');
+    }
+    
+    return history;
+}
 
 async function generateAIResponse(userId, message, retryCount = 0) {
     try {
         if (!chatSessions.has(userId)) {
-            chatSessions.set(userId, [
-                { role: "system", content: SYSTEM_PROMPT }
-            ]);
+            chatSessions.set(userId, await loadChatSession(userId));
         }
 
         const history = chatSessions.get(userId);
         history.push({ role: "user", content: message });
+        await saveChatMessage(userId, "user", message);
 
         const completion = await groq.chat.completions.create({
             messages: history,
@@ -171,6 +185,7 @@ async function generateAIResponse(userId, message, retryCount = 0) {
 
         // Adiciona resposta da IA ao histórico (formato string para o modelo)
         history.push({ role: "assistant", content: JSON.stringify(validatedData) });
+        await saveChatMessage(userId, "assistant", JSON.stringify(validatedData));
 
         // Mantém o histórico sob controle
         if (history.length > 20) {
